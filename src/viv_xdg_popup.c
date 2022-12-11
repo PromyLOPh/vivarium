@@ -109,11 +109,13 @@ static void popup_unconstrain(struct viv_xdg_popup *popup) {
     }
 
     // The output box is relative to the popup's toplevel parent
+    int width, height;
+    wlr_output_effective_resolution(output->wlr_output, &width, &height);
     struct wlr_box output_box = {
         .x = lx - *popup->lx,
         .y = ly - *popup->ly,
-        .width = output->wlr_output->width,
-        .height = output->wlr_output->height,
+        .width = width,
+        .height = height,
     };
 
     wlr_xdg_popup_unconstrain_from_box(wlr_popup, &output_box);

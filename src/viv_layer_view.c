@@ -162,8 +162,8 @@ void viv_layers_arrange(struct viv_output *output) {
     int ox = output_layout_output->x + output->excluded_margin.left;
     int oy = output_layout_output->y + output->excluded_margin.top;
 
-    uint32_t output_width = output->wlr_output->width;
-    uint32_t output_height = output->wlr_output->height;
+    int output_width, output_height;
+    wlr_output_effective_resolution(output->wlr_output, &output_width, &output_height);
 
     // TODO: This layout function is inefficient and relies on some guesses about how the
     // layer shell is supposed to work, it needs reassessment later

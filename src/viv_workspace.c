@@ -183,8 +183,8 @@ void viv_workspace_do_layout(struct viv_workspace *workspace) {
     ASSERT(output);
     struct viv_layout *layout = workspace->active_layout;
 
-    int32_t width = output->wlr_output->width;
-    int32_t height = output->wlr_output->height;
+    int width, height;
+    wlr_output_effective_resolution(output->wlr_output, &width, &height);
     if (!layout->ignore_excluded_regions) {
         width -= (output->excluded_margin.left + output->excluded_margin.right);
         height -= (output->excluded_margin.top - output->excluded_margin.bottom);

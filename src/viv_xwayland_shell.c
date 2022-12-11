@@ -197,8 +197,10 @@ static void event_xwayland_surface_map(struct wl_listener *listener, void *data)
             // TODO: Make this nice by actually checking the window type
             struct viv_output *output = view->workspace->output;
             if (output != NULL) {
-                x += (uint32_t)(0.5 * output->wlr_output->width - 0.5 * width);
-                y += (uint32_t)(0.5 * output->wlr_output->height - 0.5 * height);
+                int output_width, output_height;
+                wlr_output_effective_resolution(output->wlr_output, &output_width, &output_height);
+                x += (uint32_t)(0.5 * output_width - 0.5 * width);
+                y += (uint32_t)(0.5 * output_height - 0.5 * height);
             }
         }
         width += view->server->config->border_width * 2;
@@ -218,6 +220,10 @@ static void event_xwayland_surface_map(struct wl_listener *listener, void *data)
     }
 
     view->surface_tree = viv_surface_tree_root_create(view->server, view->xwayland_surface->surface, &add_xwayland_view_global_coords, view);
+
+    /* Send enter event for HiDPI support */
+    wlr_log(WLR_INFO, "Sending HiDPI enter event to view’s xdg surface %p", view);
+    wlr_surface_send_enter(view->xwayland_surface->surface, view->workspace->output->wlr_output);
 }
 
 static void event_xwayland_surface_unmap(struct wl_listener *listener, void *data) {
@@ -368,22 +374,25 @@ static void implementation_grow_and_center_fullscreen(struct viv_view *view) {
         return;
     }
 
-    int width = output->wlr_output->width;
+    int effective_width, effective_height;
+    wlr_output_effective_resolution(output->wlr_output, &effective_width, &effective_height);
+
+    int width = effective_width;
     if ((hints->max_width > 0) && ((int) hints->max_width < width)) {
         width = hints->max_width;
     } else if ((hints->min_width > 0) && ((int) hints->min_width > width)) {
         width = hints->min_width;
     }
 
-    int height = output->wlr_output->height;
+    int height = effective_height;
     if ((hints->max_height > 0) && ((int) hints->max_height < height)) {
         height = hints->max_height;
     } else if ((hints->min_height > 0) && ((int) hints->min_height > height)) {
         height = hints->min_height;
     }
 
-    int x = (output->wlr_output->width - width) / 2;
-    int y = (output->wlr_output->height - height) / 2;
+    int x = (effective_width - width) / 2;
+    int y = (effective_height - height) / 2;
     viv_view_set_target_box(view, x, y, width, height);
 }
 

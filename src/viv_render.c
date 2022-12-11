@@ -18,6 +18,13 @@
 
 #define MAX(A, B) (A > B ? A : B)
 
+static void scale_box(struct wlr_box *box, float scale) {
+    box->x *= scale;
+    box->y *= scale;
+    box->width *= scale;
+    box->height *= scale;
+}
+
 /* Used to move all of the data necessary to render a surface from the top-level
  * frame handler to the per-surface render function. */
 // TODO: should this be internal to viv_render.c?
@@ -153,12 +160,15 @@ static void render_rect(struct wlr_box *box, struct viv_output *output, pixman_r
 static void render_fullscreen_fill(struct viv_view *view, struct viv_output *output, pixman_region32_t *output_damage) {
     float black[] = {0, 0, 0, 1};
     struct wlr_box box;
+    int width, height;
+    wlr_output_effective_resolution(output->wlr_output, &width, &height);
 
     // top
     box.x = 0;
     box.y = 0;
-    box.width = output->wlr_output->width;
+    box.width = width;
     box.height = view->target_box.y;
+    scale_box (&box, output->wlr_output->scale);
     if (box.width > 0 && box.height > 0) {
         render_rect(&box, output, output_damage, black);
     }
@@ -168,6 +178,7 @@ static void render_fullscreen_fill(struct viv_view *view, struct viv_output *out
     box.y = view->target_box.y;
     box.width = view->target_box.x;
     box.height = view->target_box.height;
+    scale_box (&box, output->wlr_output->scale);
     if (box.width > 0 && box.height > 0) {
         render_rect(&box, output, output_damage, black);
     }
@@ -175,8 +186,9 @@ static void render_fullscreen_fill(struct viv_view *view, struct viv_output *out
     // right
     box.x = view->target_box.x + view->target_box.width;
     box.y = view->target_box.y;
-    box.width = output->wlr_output->width - box.x;
+    box.width = width - box.x;
     box.height = view->target_box.height;
+    scale_box (&box, output->wlr_output->scale);
     if (box.width > 0 && box.height > 0) {
         render_rect(&box, output, output_damage, black);
     }
@@ -184,8 +196,9 @@ static void render_fullscreen_fill(struct viv_view *view, struct viv_output *out
     // bottom
     box.x = 0;
     box.y = view->target_box.y + view->target_box.height;
-    box.width = output->wlr_output->width;
-    box.height = output->wlr_output->height - box.y;
+    box.width = width;
+    box.height = height - box.y;
+    scale_box (&box, output->wlr_output->scale);
     if (box.width > 0 && box.height > 0) {
         render_rect(&box, output, output_damage, black);
     }
@@ -209,8 +222,6 @@ static void render_borders(struct viv_view *view, struct viv_output *output, pix
 
     int line_width = server->config->border_width;
 
-    // TODO: account for scale factor
-
     struct wlr_box box;
 
     // bottom
@@ -218,6 +229,7 @@ static void render_borders(struct viv_view *view, struct viv_output *output, pix
     box.y = y;
     box.width = width;
     box.height = line_width;
+    scale_box(&box, output->wlr_output->scale);
     render_rect(&box, output, output_damage, colour);
 
     // top
@@ -225,6 +237,7 @@ static void render_borders(struct viv_view *view, struct viv_output *output, pix
     box.y = y + height - line_width;
     box.width = width;
     box.height = line_width;
+    scale_box(&box, output->wlr_output->scale);
     render_rect(&box, output, output_damage, colour);
 
     // left
@@ -232,6 +245,7 @@ static void render_borders(struct viv_view *view, struct viv_output *output, pix
     box.y = y;
     box.width = line_width;
     box.height = height;
+    scale_box(&box, output->wlr_output->scale);
     render_rect(&box, output, output_damage, colour);
 
     // right
@@ -239,6 +253,7 @@ static void render_borders(struct viv_view *view, struct viv_output *output, pix
     box.y = y;
     box.width = line_width;
     box.height = height;
+    scale_box(&box, output->wlr_output->scale);
     render_rect(&box, output, output_damage, colour);
 
 }
@@ -462,11 +477,9 @@ void viv_render_output(struct wlr_renderer *renderer, struct viv_output *output)
         pixman_region32_union_rect(&damage, &damage, 0, 0, width, height);
     }
 
-    /* The "effective" resolution can change if you rotate your outputs. */
-    int width, height;
-    wlr_output_effective_resolution(output->wlr_output, &width, &height);
     /* Begin the renderer (calls glViewport and some other GL sanity checks) */
-    wlr_renderer_begin(renderer, width, height);
+    struct wlr_output *wlr_output = output->wlr_output;
+    wlr_renderer_begin(renderer, wlr_output->width, wlr_output->height);
 
     if (output->server->config->debug_mark_undamaged_regions) {
         // Clear the output with a solid colour, so that it is easy to
@@ -600,7 +613,6 @@ void viv_render_output(struct wlr_renderer *renderer, struct viv_output *output)
     pixman_region32_init(&frame_damage);
 
     // Fill in frame damage
-    struct wlr_output *wlr_output = output->wlr_output;
     int fwidth, fheight;
     wlr_output_transformed_resolution(wlr_output, &fwidth, &fheight);
     enum wl_output_transform transform = wlr_output_transform_invert(wlr_output->transform);
